@@ -14,6 +14,8 @@
 </head>
 <body>
   <h2>Task Tracker</h2>
+
+  <!-- Add Task Form -->
   <form id="taskForm">
     <label>
       Task:
@@ -33,8 +35,9 @@
     <button type="submit">Add Task</button>
   </form>
 
+  <!-- Task List Table -->
   <h3>Task List</h3>
-  <table id="taskTable">
+  <table>
     <thead>
       <tr>
         <th>Task</th>
@@ -43,27 +46,36 @@
         <th>Completed</th>
       </tr>
     </thead>
-    <tbody id="taskBody">
-      <!-- Tasks will be added here -->
-    </tbody>
+    <tbody id="taskBody"></tbody>
   </table>
 
   <script>
-    const webhookUrl = 'https://jjquintanilla.app.n8n.cloud/webhook-test/save-task';
+    const webhookUrl = 'https://jjquintanilla.app.n8n.cloud/webhook/save-task';
 
-    function renderTaskRow(task, hour, minute, ampm, status) {
-      const displayHour = (hour % 12 || 12).toString().padStart(2, '0');
-      const paddedMinute = minute.toString().padStart(2, '0');
-      const time = `${displayHour}:${paddedMinute} ${ampm}`;
-
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${task}</td>
-        <td>${time}</td>
-        <td><input type="checkbox" class="ongoingCheckbox" ${status === 'ongoing' ? 'checked' : ''} onclick="toggleCheckbox(this, 'ongoing')"></td>
-        <td><input type="checkbox" class="completedCheckbox" ${status === 'completed' ? 'checked' : ''} onclick="toggleCheckbox(this, 'completed')"></td>
+    function renderRow({ Task, hh, mm, ampm, status }) {
+      const hourStr = (parseInt(hh) % 12 || 12).toString().padStart(2, '0');
+      const minStr = typeof mm !== 'undefined' ? mm.toString().padStart(2, '0') : '00';
+      const time = `${hourStr}:${minStr} ${ampm}`;
+      return `
+        <tr>
+          <td>${Task}</td>
+          <td>${time}</td>
+          <td><input type="checkbox" ${status === 'ongoing' ? 'checked' : ''} disabled></td>
+          <td><input type="checkbox" ${status === 'completed' ? 'checked' : ''} disabled></td>
+        </tr>
       `;
-      document.getElementById('taskBody').appendChild(tr);
+    }
+
+    function fetchAndRenderTasks() {
+      fetch(webhookUrl)
+        .then(response => response.json())
+        .then(data => {
+          const rows = Array.isArray(data)
+            ? data.map(renderRow).join('')
+            : renderRow(data);
+          document.getElementById('taskBody').innerHTML = rows;
+        })
+        .catch(error => console.error('❌ Error fetching tasks:', error));
     }
 
     document.getElementById('taskForm').addEventListener('submit', function (e) {
@@ -78,8 +90,6 @@
       let paddedHour = hour.toString().padStart(2, '0');
       let paddedMinute = minute.toString().padStart(2, '0');
 
-      renderTaskRow(name, hour, minute, ampm, status);
-
       fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -92,25 +102,26 @@
         })
       })
       .then(response => response.json())
-      .then(data => console.log('Saved to webhook:', data))
-      .catch(error => console.error('Save error:', error));
+      .then(() => {
+        const newTask = {
+            Task: name,
+            hh: parseInt(hour),
+            mm: parseInt(minute),
+            ampm: ampm,
+            status: status
+        };
+
+        const newRow = renderRow(newTask);
+        document.getElementById('taskBody').insertAdjacentHTML('beforeend', newRow);
+        })
+
+      .catch(error => console.error('❌ Save error:', error));
 
       this.reset();
     });
 
-    function toggleCheckbox(checkbox, type) {
-      const row = checkbox.closest('tr');
-      const ongoing = row.querySelector('.ongoingCheckbox');
-      const completed = row.querySelector('.completedCheckbox');
-
-      if (type === 'ongoing' && checkbox.checked) {
-        completed.checked = false;
-      } else if (type === 'completed' && checkbox.checked) {
-        ongoing.checked = false;
-      }
-
-      // Optional: PATCH the updated status to the webhook
-    }
+    // Initial fetch of tasks
+    fetchAndRenderTasks();
   </script>
 </body>
 </html>
