@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Task Viewer</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 10px; }
+    th { background-color: #f2f2f2; }
+  </style>
+</head>
+<body>
+  <h2>Task List from Google Sheets</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Task</th>
+        <th>Time</th>
+        <th>Ongoing</th>
+        <th>Completed</th>
+      </tr>
+    </thead>
+    <tbody id="taskBody"></tbody>
+  </table>
+
+  <script>
+    const webhookUrl = 'https://jjquintanilla.app.n8n.cloud/webhook-test/save-task';
+
+    function renderRow({ Task, hh, mm, ampm, status }) {
+  const formattedTime = `${(parseInt(hh) % 12 || 12).toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')} ${ampm}`;
+  return `
+    <tr>
+      <td>${Task}</td>
+      <td>${formattedTime}</td>
+      <td><input type="checkbox" ${status === 'ongoing' ? 'checked' : ''} disabled></td>
+      <td><input type="checkbox" ${status === 'completed' ? 'checked' : ''} disabled></td>
+    </tr>
+  `;
+}
+
+fetch(webhookUrl)
+  .then(response => response.json())
+  .then(data => {
+    console.log("✅ Parsed JSON:", data);
+    const rows = data.map(task => {
+      const { Task, hh, mm, ampm, status } = task;
+      const hourStr = (parseInt(hh) % 12 || 12).toString().padStart(2, '0');
+      const minStr = (typeof mm !== 'undefined' ? mm.toString().padStart(2, '0') : '00');
+      const time = `${hourStr}:${minStr} ${ampm}`;
+
+      return `
+        <tr>
+          <td>${Task}</td>
+          <td>${time}</td>
+          <td><input type="checkbox" ${status === 'ongoing' ? 'checked' : ''} disabled></td>
+          <td><input type="checkbox" ${status === 'completed' ? 'checked' : ''} disabled></td>
+        </tr>
+      `;
+    }).join('');
+
+    document.getElementById('taskBody').innerHTML = rows;
+  })
+  .catch(error => console.error('❌ Error fetching tasks:', error));
+
+
+  </script>
+</body>
+</html>

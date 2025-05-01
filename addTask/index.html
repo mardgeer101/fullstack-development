@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Task Tracker</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    input, button, select { padding: 8px; margin: 5px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+    th { background-color: #f2f2f2; }
+  </style>
+</head>
+<body>
+  <h2>Task Tracker</h2>
+  <form id="taskForm">
+    <label>
+      Task:
+      <input type="text" id="taskName" required />
+    </label>
+    <label>
+      Time of Completion (HH:MM):
+      <input type="time" id="taskTime" required />
+    </label>
+    <label>
+      Status:
+      <select id="taskStatus" required>
+        <option value="ongoing">Ongoing</option>
+        <option value="completed">Completed</option>
+      </select>
+    </label>
+    <button type="submit">Add Task</button>
+  </form>
+
+  <h3>Task List</h3>
+  <table id="taskTable">
+    <thead>
+      <tr>
+        <th>Task</th>
+        <th>Time</th>
+        <th>Ongoing</th>
+        <th>Completed</th>
+      </tr>
+    </thead>
+    <tbody id="taskBody">
+      <!-- Tasks will be added here -->
+    </tbody>
+  </table>
+
+  <script>
+    const webhookUrl = 'https://jjquintanilla.app.n8n.cloud/webhook-test/save-task';
+
+    function renderTaskRow(task, hour, minute, ampm, status) {
+      const displayHour = (hour % 12 || 12).toString().padStart(2, '0');
+      const paddedMinute = minute.toString().padStart(2, '0');
+      const time = `${displayHour}:${paddedMinute} ${ampm}`;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${task}</td>
+        <td>${time}</td>
+        <td><input type="checkbox" class="ongoingCheckbox" ${status === 'ongoing' ? 'checked' : ''} onclick="toggleCheckbox(this, 'ongoing')"></td>
+        <td><input type="checkbox" class="completedCheckbox" ${status === 'completed' ? 'checked' : ''} onclick="toggleCheckbox(this, 'completed')"></td>
+      `;
+      document.getElementById('taskBody').appendChild(tr);
+    }
+
+    document.getElementById('taskForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const name = document.getElementById('taskName').value;
+      const time = document.getElementById('taskTime').value;
+      const status = document.getElementById('taskStatus').value;
+
+      let [hour, minute] = time.split(":").map(Number);
+      let ampm = hour >= 12 ? "PM" : "AM";
+      let paddedHour = hour.toString().padStart(2, '0');
+      let paddedMinute = minute.toString().padStart(2, '0');
+
+      renderTaskRow(name, hour, minute, ampm, status);
+
+      fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task: name,
+          hour: paddedHour,
+          minute: paddedMinute,
+          ampm: ampm,
+          status: status
+        })
+      })
+      .then(response => response.json())
+      .then(data => console.log('Saved to webhook:', data))
+      .catch(error => console.error('Save error:', error));
+
+      this.reset();
+    });
+
+    function toggleCheckbox(checkbox, type) {
+      const row = checkbox.closest('tr');
+      const ongoing = row.querySelector('.ongoingCheckbox');
+      const completed = row.querySelector('.completedCheckbox');
+
+      if (type === 'ongoing' && checkbox.checked) {
+        completed.checked = false;
+      } else if (type === 'completed' && checkbox.checked) {
+        ongoing.checked = false;
+      }
+
+      // Optional: PATCH the updated status to the webhook
+    }
+  </script>
+</body>
+</html>
